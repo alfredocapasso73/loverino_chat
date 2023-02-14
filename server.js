@@ -90,7 +90,8 @@ const init = async () => {
                     };
                     console.log('chat_message',chat_message);
                     const chat = new Chat(chat_message);
-                    await chat.save();
+                    const chat_result = await chat.save();
+                    console.log('chat_result',chat_result);
                     const recipient = all_sockets.find(el => el.user_id === counter_part_id);
                     if(recipient){
                         console.log('recipient',recipient);
