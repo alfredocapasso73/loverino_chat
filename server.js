@@ -1,12 +1,14 @@
 const express = require("express");
 const mongoose = require("mongoose");
+const fs = require('fs');
 const { createServer } = require("http");
 const { Server } = require("socket.io");
 const cors = require('cors');
 const app = express();
 app.use(express.json({limit: '50mb'}));
-
 app.use(cors());
+
+const options = {};
 
 const cors_origins = [];
 if(process.env.IS_LOCAL){
@@ -15,6 +17,8 @@ if(process.env.IS_LOCAL){
 else{
     cors_origins.push('https://www.loverino.se');
     cors_origins.push('https://loverino.se');
+    options.key = fs.readFileSync('/etc/letsencrypt/live/chat.loverino.se/privkey.pem');
+    options.cert = fs.readFileSync('/etc/letsencrypt/live/chat.loverino.se/fullchain.pem');
 }
 app.use(cors({
     origin: cors_origins,
@@ -40,7 +44,7 @@ const init = async () => {
             });
         });
 
-        const httpServer = createServer(app);
+        const httpServer = createServer(options, app);
         const io = new Server(httpServer, {
             cors: {
                 origin: "*",
