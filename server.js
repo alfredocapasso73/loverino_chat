@@ -1,6 +1,10 @@
 const express = require("express");
 const mongoose = require("mongoose");
 const fs = require('fs');
+const User = require('./models/user');
+const Chat = require('./models/chat');
+const { v4: uuidv4 } = require('uuid');
+require("dotenv").config();
 const { createServer } = require("https");
 const { Server } = require("socket.io");
 const cors = require('cors');
@@ -19,16 +23,10 @@ const cors_origins =
     ];
 const cors_methods = ['GET','POST','DELETE','UPDATE','PUT','PATCH','OPTIONS'];
 
-const web_cors = {
-    origin: cors_origins,
-    methods: cors_methods
-};
-app.use(cors(web_cors));
+const web_cors = {origin: cors_origins,methods: cors_methods};
+const io_cors = {origin: cors_origins,methods: ["GET", "POST"]};
 
-const User = require('./models/user');
-const Chat = require('./models/chat');
-const { v4: uuidv4 } = require('uuid');
-require("dotenv").config();
+app.use(cors(web_cors));
 
 const init = async () => {
     console.log('MONGO_DB:',process.env.MONGO_DB);
@@ -36,18 +34,12 @@ const init = async () => {
     try{
         mongoose.set('strictQuery', false);
         await mongoose.connect(process.env.MONGO_DB);
-        console.log('MongoDB connected!!');
         app.get("/", (req, res) => {
             res.status(200).json({ alive: "True" });
         });
 
         const httpServer = createServer(options, app);
-        const io = new Server(httpServer, {
-            cors: {
-                origin: cors_origins,
-                methods: ["GET", "POST"],
-            }
-        });
+        const io = new Server(httpServer, {cors: io_cors});
 
         io.use(async (socket, next) => {
             if(socket.handshake.headers.tkn){
@@ -67,6 +59,7 @@ const init = async () => {
                 }
             }
         });
+
         let all_sockets = [];
 
         io.on("connection", async (socket) => {
