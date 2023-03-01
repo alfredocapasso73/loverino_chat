@@ -1,29 +1,29 @@
 const express = require("express");
 const mongoose = require("mongoose");
 const fs = require('fs');
-const { createServer } = require("http");
+const { createServer } = require("https");
 const { Server } = require("socket.io");
 const cors = require('cors');
 const app = express();
 app.use(express.json({limit: '50mb'}));
-app.use(cors());
 
 const options = {};
+options.key = fs.readFileSync(process.env.SSL_KEY);
+options.cert = fs.readFileSync(process.env.SSL_CERTIFICATE);
 
-const cors_origins = [];
-if(process.env.IS_LOCAL){
-    cors_origins.push('http://localoverino.se:8080');
-}
-else{
-    cors_origins.push('https://www.loverino.se');
-    cors_origins.push('https://loverino.se');
-    options.key = fs.readFileSync('/etc/letsencrypt/live/chat.loverino.se/privkey.pem');
-    options.cert = fs.readFileSync('/etc/letsencrypt/live/chat.loverino.se/fullchain.pem');
-}
-app.use(cors({
+const cors_origins =
+    [
+        "https://localoverino.se:8080"
+        ,"https://loverino.se"
+        ,"https://www.loverino.se"
+    ];
+const cors_methods = ['GET','POST','DELETE','UPDATE','PUT','PATCH','OPTIONS'];
+
+const web_cors = {
     origin: cors_origins,
-    methods: ['GET','POST','DELETE','UPDATE','PUT','PATCH']
-}));
+    methods: cors_methods
+};
+app.use(cors(web_cors));
 
 const User = require('./models/user');
 const Chat = require('./models/chat');
@@ -37,25 +37,22 @@ const init = async () => {
         mongoose.set('strictQuery', false);
         await mongoose.connect(process.env.MONGO_DB);
         console.log('MongoDB connected!!');
-        app.get("/chat/alive", (req, res) => {
-            res.status(200).send({
-                success: true,
-                message: "welcome to the beginning of greatness",
-            });
+        app.get("/", (req, res) => {
+            res.status(200).json({ alive: "True" });
         });
 
         const httpServer = createServer(options, app);
         const io = new Server(httpServer, {
             cors: {
-                origin: "*",
+                origin: cors_origins,
                 methods: ["GET", "POST"],
-            },
+            }
         });
 
         io.use(async (socket, next) => {
-            if(socket.handshake.headers.access_token){
+            if(socket.handshake.headers.tkn){
                 try{
-                    const access_token = socket.handshake.headers.access_token;
+                    const access_token = socket.handshake.headers.tkn;
                     console.log("access_token:",access_token);
                     const found = await User.findOne({access_token: access_token});
                     if(found){
@@ -73,6 +70,7 @@ const init = async () => {
         let all_sockets = [];
 
         io.on("connection", async (socket) => {
+            console.log('socket connection::::',socket.id);
             const ob = {
                 id: socket.id,
                 room: socket.room,
@@ -96,6 +94,7 @@ const init = async () => {
                 }
             });
             console.log('all_sockets again:',all_sockets);
+
 
             socket.on("message", async (data) => {
                 const counter_part = await User.findOne({_id: {$ne: socket.user_id}, room: socket.room});
